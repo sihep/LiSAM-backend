@@ -1,0 +1,9 @@
+{
+    "dotnet.defaultSolution": "${workspaceFolder}/LiSAM.sln",
+    "editor.formatOnSave": true,
+    "files.exclude": {
+        "**/bin": true,
+        "**/obj": true,
+        "**/.idea": true
+    }
+}
