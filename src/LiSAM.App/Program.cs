@@ -1,4 +1,6 @@
-﻿using LiSAM.Visualization;
+﻿using System;
+using System.Threading.Tasks;
+using LiSAM.Visualization;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.Desktop;

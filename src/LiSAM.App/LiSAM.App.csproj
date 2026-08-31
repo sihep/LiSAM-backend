@@ -15,4 +15,8 @@
         <ProjectReference Include="..\LiSAM.Core\LiSAM.Core.csproj"/>
         <ProjectReference Include="..\LiSAM.Visualization\LiSAM.Visualization.csproj"/>
     </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\..\dataset\**" CopyToOutputDirectory="PreserveNewest" LinkBase="dataset\" />
+    </ItemGroup>
 </Project>
