@@ -12,7 +12,7 @@ public class Visualizer(GameWindowSettings gameWindowSettings, NativeWindowSetti
     : GameWindow(gameWindowSettings, nativeWindowSettings)
 {
     private readonly object _pendingSync = new();
-    private readonly List<CloudPoint> _pendingPoints = [];
+    private readonly Dictionary<PointHandle, CloudPoint> _pendingPoints = [];
     private readonly List<CloudLine> _pendingLines = [];
     private readonly List<TranslucentCuboid> _pendingCuboids = [];
 
@@ -23,59 +23,86 @@ public class Visualizer(GameWindowSettings gameWindowSettings, NativeWindowSetti
     private bool _loaded;
     private float _yaw;
     private float _pitch;
+    private long _nextPointId;
 
-    public int PointCount => _loaded ? _points.Count : PendingPointCount;
-
-    private int PendingPointCount
+    public int PointCount
     {
         get
         {
-            lock (_pendingSync) return _pendingPoints.Count;
+            lock (_pendingSync) return _loaded ? _points.Count : _pendingPoints.Count;
         }
     }
 
     /// <summary>Adds one point. Size is its on-screen diameter in pixels.</summary>
-    public void AddPoint(Vector3 position, Vector3 color, float size = 3f) =>
+    public PointHandle AddPoint(Vector3 position, Vector3 color, float size = 3f) =>
         AddPoint(new CloudPoint(position, color, size));
 
-    public void AddPoint(Vector3 position) => AddPoint(position, Vector3.One);
+    public PointHandle AddPoint(Vector3 position) => AddPoint(position, Vector3.One);
 
-    public void AddPoint(CloudPoint point)
+    public PointHandle AddPoint(CloudPoint point)
     {
-        if (_loaded)
+        var handle = new PointHandle(Interlocked.Increment(ref _nextPointId));
+        lock (_pendingSync)
         {
-            _points.AddPoint(point);
-            return;
+            if (_loaded) _points.AddPoint(handle, point);
+            else _pendingPoints.Add(handle, point);
         }
-
-        lock (_pendingSync) _pendingPoints.Add(point);
+        return handle;
     }
 
     /// <summary>
     /// Adds a batch without creating a render object per point. Prefer this overload
     /// when loading large datasets.
     /// </summary>
-    public void AddPoints(ReadOnlySpan<CloudPoint> points)
+    public PointHandle[] AddPoints(ReadOnlySpan<CloudPoint> points)
     {
-        if (_loaded)
-        {
-            _points.AddPoints(points);
-            return;
-        }
+        var handles = new PointHandle[points.Length];
+        for (var i = 0; i < handles.Length; i++)
+            handles[i] = new PointHandle(Interlocked.Increment(ref _nextPointId));
 
         lock (_pendingSync)
         {
-            _pendingPoints.EnsureCapacity(_pendingPoints.Count + points.Length);
-            foreach (var point in points) _pendingPoints.Add(point);
+            if (_loaded)
+            {
+                _points.AddPoints(handles, points);
+            }
+            else
+            {
+                for (var i = 0; i < points.Length; i++)
+                    _pendingPoints.Add(handles[i], points[i]);
+            }
+        }
+        return handles;
+    }
+
+    /// <summary>Removes a point before startup or while the window is running.</summary>
+    public bool RemovePoint(PointHandle handle)
+    {
+        lock (_pendingSync)
+        {
+            return _loaded ? _points.RemovePoint(handle) : _pendingPoints.Remove(handle);
+        }
+    }
+
+    public int RemovePoints(ReadOnlySpan<PointHandle> handles)
+    {
+        lock (_pendingSync)
+        {
+            if (_loaded) return _points.RemovePoints(handles);
+            var removed = 0;
+            foreach (var handle in handles)
+                if (_pendingPoints.Remove(handle)) removed++;
+            return removed;
         }
     }
 
     public void ClearPoints()
     {
-        if (_loaded)
-            _points.Clear();
-        else
-            lock (_pendingSync) _pendingPoints.Clear();
+        lock (_pendingSync)
+        {
+            if (_loaded) _points.Clear();
+            else _pendingPoints.Clear();
+        }
     }
 
     public void AddLine(Vector3 start, Vector3 end, Vector4 color) =>
@@ -151,15 +178,16 @@ public class Visualizer(GameWindowSettings gameWindowSettings, NativeWindowSetti
 
         lock (_pendingSync)
         {
-            _points.AddPoints(_pendingPoints.ToArray());
+            var pendingHandles = _pendingPoints.Keys.ToArray();
+            var pendingPoints = _pendingPoints.Values.ToArray();
+            _points.AddPoints(pendingHandles, pendingPoints);
             _primitives.AddLines(_pendingLines.ToArray());
             _primitives.AddCuboids(_pendingCuboids.ToArray());
             _pendingPoints.Clear();
             _pendingLines.Clear();
             _pendingCuboids.Clear();
+            _loaded = true;
         }
-
-        _loaded = true;
     }
 
     protected override void OnUpdateFrame(FrameEventArgs args)
@@ -220,10 +248,14 @@ public class Visualizer(GameWindowSettings gameWindowSettings, NativeWindowSetti
 
     protected override void OnUnload()
     {
-        if (_loaded)
+        lock (_pendingSync)
         {
-            _points.Dispose();
-            _primitives.Dispose();
+            if (_loaded)
+            {
+                _loaded = false;
+                _points.Dispose();
+                _primitives.Dispose();
+            }
         }
         base.OnUnload();
     }

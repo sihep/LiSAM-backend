@@ -1,5 +1,4 @@
-﻿using LiSAM.Core.Data;
-using LiSAM.Visualization;
+﻿using LiSAM.Visualization;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.Desktop;
@@ -8,24 +7,30 @@ namespace LiSAM.App;
 
 public static class Program
 {
-    private static void Main()
+    private static Task Main()
     {
-        var nativeWindowSettings = new NativeWindowSettings
+        try
         {
-            ClientSize = new Vector2i(1920, 1080),
-            Title = "LiSAM",
-            Flags = ContextFlags.ForwardCompatible
-        };
+            var nativeWindowSettings = new NativeWindowSettings
+            {
+                ClientSize = new Vector2i(1920, 1080),
+                Title = "LiSAM",
+                Flags = ContextFlags.ForwardCompatible
+            };
 
-        using var visualizer = new Visualizer(GameWindowSettings.Default, nativeWindowSettings);
-        var data = DataImporter.ImportData("../../../../../dataset/000008.bin", "../../../../../dataset/calib.txt");
-        foreach (var point in data.Points)
-        {
-            var cloudPoint = new CloudPoint(new Vector3(point.X, point.Y, point.Z),
-                new Vector3(point.W, point.W, point.W));
-            visualizer.AddPoint(cloudPoint);
+            var visualizer = new Visualizer(GameWindowSettings.Default, nativeWindowSettings);
+            Task.Run(() =>
+            {
+                var lisam = new LiSam(visualizer);
+                lisam.Run();
+            });
+
+            visualizer.Run();
+            return Task.CompletedTask;
         }
-
-        visualizer.Run();
+        catch (Exception exception)
+        {
+            return Task.FromException(exception);
+        }
     }
 }

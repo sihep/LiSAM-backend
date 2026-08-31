@@ -12,7 +12,8 @@ public sealed class PointCloudRenderer : IDisposable
 {
     private const int FloatsPerPoint = 7;
     private readonly object _sync = new();
-    private readonly List<float> _vertices = [];
+    private readonly List<PointEntry> _points = [];
+    private readonly Dictionary<PointHandle, int> _indices = [];
     private readonly ShaderProgram _shader;
 
     private int _vao;
@@ -26,7 +27,7 @@ public sealed class PointCloudRenderer : IDisposable
     {
         get
         {
-            lock (_sync) return _vertices.Count / FloatsPerPoint;
+            lock (_sync) return _points.Count;
         }
     }
 
@@ -60,36 +61,72 @@ public sealed class PointCloudRenderer : IDisposable
         GL.BindVertexArray(0);
     }
 
-    public void AddPoint(CloudPoint point)
+    public void AddPoint(PointHandle handle, CloudPoint point)
     {
         Validate(point);
         lock (_sync)
         {
-            Append(point);
+            if (!handle.IsValid || _indices.ContainsKey(handle))
+                throw new ArgumentException("Point handle must be valid and unique.", nameof(handle));
+            _indices.Add(handle, _points.Count);
+            _points.Add(new PointEntry(handle, point));
             _version++;
         }
     }
 
-    public void AddPoints(ReadOnlySpan<CloudPoint> points)
+    public void AddPoints(ReadOnlySpan<PointHandle> handles, ReadOnlySpan<CloudPoint> points)
     {
+        if (handles.Length != points.Length)
+            throw new ArgumentException("Handle and point counts must match.");
         lock (_sync)
         {
-            _vertices.EnsureCapacity(_vertices.Count + points.Length * FloatsPerPoint);
-            foreach (var point in points)
+            _points.EnsureCapacity(_points.Count + points.Length);
+            for (var i = 0; i < points.Length; i++)
             {
-                Validate(point);
-                Append(point);
+                Validate(points[i]);
+                if (!handles[i].IsValid || _indices.ContainsKey(handles[i]))
+                    throw new ArgumentException("Every point handle must be valid and unique.", nameof(handles));
+                _indices.Add(handles[i], _points.Count);
+                _points.Add(new PointEntry(handles[i], points[i]));
             }
 
             if (points.Length > 0) _version++;
         }
     }
 
+    public bool RemovePoint(PointHandle handle)
+    {
+        lock (_sync)
+        {
+            if (!_indices.Remove(handle, out var index)) return false;
+
+            var lastIndex = _points.Count - 1;
+            if (index != lastIndex)
+            {
+                var moved = _points[lastIndex];
+                _points[index] = moved;
+                _indices[moved.Handle] = index;
+            }
+            _points.RemoveAt(lastIndex);
+            _version++;
+            return true;
+        }
+    }
+
+    public int RemovePoints(ReadOnlySpan<PointHandle> handles)
+    {
+        var removed = 0;
+        foreach (var handle in handles)
+            if (RemovePoint(handle)) removed++;
+        return removed;
+    }
+
     public void Clear()
     {
         lock (_sync)
         {
-            _vertices.Clear();
+            _points.Clear();
+            _indices.Clear();
             _version++;
         }
     }
@@ -113,8 +150,10 @@ public sealed class PointCloudRenderer : IDisposable
         lock (_sync)
         {
             if (_uploadedVersion == _version) return;
-            snapshot = _vertices.ToArray();
-            _pointCount = snapshot.Length / FloatsPerPoint;
+            snapshot = new float[_points.Count * FloatsPerPoint];
+            var offset = 0;
+            foreach (var entry in _points) Append(snapshot, ref offset, entry.Point);
+            _pointCount = _points.Count;
             _uploadedVersion = _version;
         }
 
@@ -126,16 +165,18 @@ public sealed class PointCloudRenderer : IDisposable
             BufferUsage.DynamicDraw);
     }
 
-    private void Append(CloudPoint point)
+    private static void Append(float[] vertices, ref int offset, CloudPoint point)
     {
-        _vertices.Add(point.Position.X);
-        _vertices.Add(point.Position.Y);
-        _vertices.Add(point.Position.Z);
-        _vertices.Add(point.Color.X);
-        _vertices.Add(point.Color.Y);
-        _vertices.Add(point.Color.Z);
-        _vertices.Add(point.Size);
+        vertices[offset++] = point.Position.X;
+        vertices[offset++] = point.Position.Y;
+        vertices[offset++] = point.Position.Z;
+        vertices[offset++] = point.Color.X;
+        vertices[offset++] = point.Color.Y;
+        vertices[offset++] = point.Color.Z;
+        vertices[offset++] = point.Size;
     }
+
+    private readonly record struct PointEntry(PointHandle Handle, CloudPoint Point);
 
     private static void Validate(CloudPoint point)
     {
