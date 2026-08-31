@@ -1,0 +1,126 @@
+name: Rolling Release
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publish ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            extension: zip
+
+          - os: ubuntu-latest
+            rid: linux-x64
+            extension: tar.gz
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore src/LiSAM.App/LiSAM.App.csproj
+
+      - name: Publish
+        run: >
+          dotnet publish
+          src/LiSAM.App/LiSAM.App.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          --output publish/${{ matrix.rid }}
+          --no-restore
+
+      # -------------------------
+      # Windows
+      # -------------------------
+
+      - name: Package Windows
+        if: matrix.rid == 'win-x64'
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path "publish/${{ matrix.rid }}/*" `
+            -DestinationPath "LiSAM-win-x64.zip"
+
+      # -------------------------
+      # Linux
+      # -------------------------
+
+      - name: Package Linux
+        if: matrix.rid == 'linux-x64'
+        shell: bash
+        run: |
+          tar -czf LiSAM-linux-x64.tar.gz \
+            -C "publish/${{ matrix.rid }}" .
+
+      # -------------------------
+      # Upload artifact
+      # -------------------------
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LiSAM-${{ matrix.rid }}
+          path: |
+            LiSAM-win-x64.zip
+            LiSAM-linux-x64.tar.gz
+
+  release:
+    name: Update Rolling Release
+    needs: publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: LiSAM-win-x64
+          path: artifacts/windows
+
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: LiSAM-linux-x64
+          path: artifacts/linux
+
+      - name: Update rolling release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release delete rolling \
+            --yes \
+            --cleanup-tag \
+            || true
+
+          gh release create rolling \
+            artifacts/windows/LiSAM-win-x64.zip \
+            artifacts/linux/LiSAM-linux-x64.tar.gz \
+            --title "LiSAM Rolling" \
+            --notes "Latest successful build from main.
+
+          Commit: ${{ github.sha }}
+
+          This is an automated development build and may be unstable." \
+            --prerelease \
+            --target "${{ github.sha }}"
