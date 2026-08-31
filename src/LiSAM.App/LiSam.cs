@@ -8,16 +8,25 @@ public class LiSam(Visualizer visualizer)
 {
     private readonly Visualizer _visualizer = visualizer;
 
-    public void Run()
+    public void Run(string[] args)
     {
-        Console.WriteLine($"LiSAM running on {Environment.CurrentDirectory}");
+        if (args.Length < 2)
+        {
+            Console.WriteLine("Usage: LiSAM.App <point-cloud.bin> <calib.txt>");
+            return;
+        }
 
-        var data = DataImporter.ImportData("../../../../../dataset/000008.bin", "../../../../../dataset/calib.txt");
+        var data = DataImporter.ImportData(args[0], args[1]);
+
         var points = new CloudPoint[data.Points.Length];
 
         for (var i = 0; i < data.Points.Length; i++)
         {
-            points[i] = new CloudPoint(data.Points[i].Xyz, new Vector3(data.Points[i].W));
+            points[i] = new CloudPoint(
+                data.Points[i].Xyz,
+                new Vector3(data.Points[i].W)
+            );
+
             _visualizer.AddPoint(points[i]);
         }
     }

@@ -7,7 +7,7 @@ namespace LiSAM.App;
 
 public static class Program
 {
-    private static Task Main()
+    private static Task Main(String[] args)
     {
         try
         {
@@ -22,7 +22,7 @@ public static class Program
             Task.Run(() =>
             {
                 var lisam = new LiSam(visualizer);
-                lisam.Run();
+                lisam.Run(args);
             });
 
             visualizer.Run();
