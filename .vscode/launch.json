@@ -6,10 +6,10 @@
             "type": "coreclr",
             "request": "launch",
             "program": "${workspaceFolder}/src/LiSAM.App/bin/Debug/net10.0/LiSAM.App.dll",
-            "cwd": "${workspaceFolder}/src/LiSAM.App/bin/Debug/net10.0",
+            "cwd": "${workspaceFolder}/src/LiSAM.App/bin/Debug/net10.0",    
             "args": [
-                "../../../../../dataset/000008.bin",
-                "../../../../../dataset/calib.txt"
+                "dataset/000008.bin",
+                "dataset/calib.txt"
             ],
             "preLaunchTask": "build",
             "console": "integratedTerminal",

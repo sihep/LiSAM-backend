@@ -188,6 +188,10 @@ public class Visualizer(GameWindowSettings gameWindowSettings, NativeWindowSetti
             _pendingCuboids.Clear();
             _loaded = true;
         }
+
+        Console.WriteLine($"GPU: {GL.GetString(StringName.Renderer)}");
+        Console.WriteLine($"Vendor: {GL.GetString(StringName.Vendor)}");
+        Console.WriteLine($"OpenGL: {GL.GetString(StringName.Version)}");
     }
 
     protected override void OnUpdateFrame(FrameEventArgs args)
