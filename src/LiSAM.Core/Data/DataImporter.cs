@@ -9,6 +9,11 @@ public static class DataImporter
     {
         using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read);
 
+        if (fs.Length % 16 != 0)
+            throw new InvalidDataException(
+                $"Invalid LiDAR .bin file: {fs.Length} bytes is not divisible by 16."
+            );
+
         var byteBuffer = new byte[fs.Length];
         fs.ReadExactly(byteBuffer);
 
