@@ -18,7 +18,7 @@ public static class Program
         };
 
         using var visualizer = new Visualizer(GameWindowSettings.Default, nativeWindowSettings);
-        var data = DataImporter.ImportData("/home/falingunit/Projects/1.bin", "/home/falingunit/Projects/1.txt");
+        var data = DataImporter.ImportData("../../../../../dataset/000008.bin", "../../../../../dataset/calib.txt");
         foreach (var point in data.Points)
         {
             var cloudPoint = new CloudPoint(new Vector3(point.X, point.Y, point.Z),
