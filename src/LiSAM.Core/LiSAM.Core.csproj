@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="OpenTK.Mathematics" Version="5.0.0-pre.16"/>
+        <PackageReference Include="TorchSharp" Version="0.107.0"/>
+    </ItemGroup>
+</Project>
