@@ -195,6 +195,7 @@ public class Visualizer(GameWindowSettings gameWindowSettings, NativeWindowSetti
         base.OnUpdateFrame(args);
 
         const float sensitivity = 0.05f;
+        const float arrowSensitivity = 0.05f;
         const float speed = 1.5f;
         if (KeyboardState.IsKeyDown(Keys.Escape)) Close();
 
@@ -204,7 +205,6 @@ public class Visualizer(GameWindowSettings gameWindowSettings, NativeWindowSetti
             _yaw -= MouseState.Delta.X * sensitivity;
             _pitch -= MouseState.Delta.Y * sensitivity;
             _pitch = Math.Clamp(_pitch, -89f, 89f);
-            _camera.ChangeDirectionTo(_yaw, _pitch);
         }
         else
         {
@@ -218,6 +218,13 @@ public class Visualizer(GameWindowSettings gameWindowSettings, NativeWindowSetti
         if (KeyboardState.IsKeyDown(Keys.LeftShift)) _camera.MoveDown(distance);
         if (KeyboardState.IsKeyDown(Keys.W)) _camera.MoveForward(distance);
         if (KeyboardState.IsKeyDown(Keys.S)) _camera.MoveBackward(distance);
+
+        if (KeyboardState.IsKeyDown(Keys.Right)) _yaw -= arrowSensitivity;
+        if (KeyboardState.IsKeyDown(Keys.Left)) _yaw += arrowSensitivity;
+        if (KeyboardState.IsKeyDown(Keys.Up)) _pitch += arrowSensitivity;
+        if (KeyboardState.IsKeyDown(Keys.Down)) _pitch -= arrowSensitivity;
+
+        _camera.ChangeDirectionTo(_yaw, _pitch);
     }
 
     protected override void OnRenderFrame(FrameEventArgs args)
