@@ -1,3 +1,4 @@
+
 name: Rolling Release
 
 on:
@@ -53,6 +54,10 @@ jobs:
           --output publish/${{ matrix.rid }}
           --no-restore
 
+      # -------------------------
+      # Windows
+      # -------------------------
+
       - name: Package Windows
         if: matrix.rid == 'win-x64'
         shell: pwsh
@@ -61,12 +66,20 @@ jobs:
             -Path "publish/${{ matrix.rid }}/*" `
             -DestinationPath "LiSAM-win-x64.zip"
 
+      # -------------------------
+      # Linux
+      # -------------------------
+
       - name: Package Linux
         if: matrix.rid == 'linux-x64'
         shell: bash
         run: |
           tar -czf LiSAM-linux-x64.tar.gz \
             -C "publish/${{ matrix.rid }}" .
+
+      # -------------------------
+      # Upload artifact
+      # -------------------------
 
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
@@ -82,6 +95,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Each GitHub Actions job gets a fresh runner.
+      # gh needs the repository checkout to determine the repo.
+      - name: Checkout
+        uses: actions/checkout@v6
+
       - name: Download Windows artifact
         uses: actions/download-artifact@v5
         with:
