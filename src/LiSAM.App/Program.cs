@@ -1,6 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-using LiSAM.Visualization;
+﻿using LiSAM.Visualization;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.Desktop;
@@ -9,30 +7,25 @@ namespace LiSAM.App;
 
 public static class Program
 {
-    private static Task Main(String[] args)
+    private static async Task Main(string[] args)
     {
-        try
+        NativeWindowSettings nativeWindowSettings = new()
         {
-            var nativeWindowSettings = new NativeWindowSettings
-            {
-                ClientSize = new Vector2i(1920, 1080),
-                Title = "LiSAM",
-                Flags = ContextFlags.ForwardCompatible
-            };
+            ClientSize = new Vector2i(1920, 1080),
+            Title = "LiSAM",
+            Flags = ContextFlags.ForwardCompatible
+        };
 
-            var visualizer = new Visualizer(GameWindowSettings.Default, nativeWindowSettings);
-            Task.Run(() =>
-            {
-                var lisam = new LiSam(visualizer);
-                lisam.Run(args);
-            });
+        Visualizer visualizer = new(GameWindowSettings.Default, nativeWindowSettings);
 
-            visualizer.Run();
-            return Task.CompletedTask;
-        }
-        catch (Exception exception)
+        Task lisamTask = Task.Run(() =>
         {
-            return Task.FromException(exception);
-        }
+            LiSam lisam = new(visualizer);
+            lisam.Run(args);
+        });
+
+        visualizer.Run();
+
+        await lisamTask;
     }
 }

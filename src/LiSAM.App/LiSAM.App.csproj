@@ -17,6 +17,6 @@
     </ItemGroup>
 
     <ItemGroup>
-        <None Include="..\..\dataset\**" CopyToOutputDirectory="PreserveNewest" LinkBase="dataset\" />
+        <None Include="..\..\dataset\**" CopyToOutputDirectory="PreserveNewest" LinkBase="dataset\"/>
     </ItemGroup>
 </Project>

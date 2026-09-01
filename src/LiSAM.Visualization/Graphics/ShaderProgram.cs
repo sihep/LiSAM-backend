@@ -4,8 +4,8 @@ namespace LiSAM.Visualization.Graphics;
 
 internal sealed class ShaderProgram : IDisposable
 {
-    private readonly string _vertexPath;
     private readonly string _fragmentPath;
+    private readonly string _vertexPath;
     private int _handle;
 
     public ShaderProgram(string vertexPath, string fragmentPath)
@@ -14,10 +14,17 @@ internal sealed class ShaderProgram : IDisposable
         _fragmentPath = fragmentPath;
     }
 
+    public void Dispose()
+    {
+        if (_handle == 0) return;
+        GL.DeleteProgram(_handle);
+        _handle = 0;
+    }
+
     public void OnLoad()
     {
-        var vertexShader = Compile(ShaderType.VertexShader, File.ReadAllText(_vertexPath), _vertexPath);
-        var fragmentShader = Compile(ShaderType.FragmentShader, File.ReadAllText(_fragmentPath), _fragmentPath);
+        int vertexShader = Compile(ShaderType.VertexShader, File.ReadAllText(_vertexPath), _vertexPath);
+        int fragmentShader = Compile(ShaderType.FragmentShader, File.ReadAllText(_fragmentPath), _fragmentPath);
 
         try
         {
@@ -25,7 +32,7 @@ internal sealed class ShaderProgram : IDisposable
             GL.AttachShader(_handle, vertexShader);
             GL.AttachShader(_handle, fragmentShader);
             GL.LinkProgram(_handle);
-            GL.GetProgrami(_handle, ProgramProperty.LinkStatus, out var success);
+            GL.GetProgrami(_handle, ProgramProperty.LinkStatus, out int success);
             if (success == 0)
                 throw new InvalidOperationException($"Shader link failed: {GL.GetProgramInfoLog(_handle)}");
         }
@@ -40,25 +47,29 @@ internal sealed class ShaderProgram : IDisposable
 
     private static int Compile(ShaderType type, string source, string path)
     {
-        var shader = GL.CreateShader(type);
+        int shader = GL.CreateShader(type);
         GL.ShaderSource(shader, source);
         GL.CompileShader(shader);
-        GL.GetShaderi(shader, ShaderParameterName.CompileStatus, out var success);
+        GL.GetShaderi(shader, ShaderParameterName.CompileStatus, out int success);
         if (success != 0) return shader;
 
-        var message = GL.GetShaderInfoLog(shader);
+        string message = GL.GetShaderInfoLog(shader);
         GL.DeleteShader(shader);
         throw new InvalidOperationException($"Shader compilation failed for '{path}': {message}");
     }
 
-    public void Use() => GL.UseProgram(_handle);
-    public int GetAttribLocation(string name) => GL.GetAttribLocation(_handle, name);
-    public int GetUniformLocation(string name) => GL.GetUniformLocation(_handle, name);
-
-    public void Dispose()
+    public void Use()
     {
-        if (_handle == 0) return;
-        GL.DeleteProgram(_handle);
-        _handle = 0;
+        GL.UseProgram(_handle);
+    }
+
+    public int GetAttribLocation(string name)
+    {
+        return GL.GetAttribLocation(_handle, name);
+    }
+
+    public int GetUniformLocation(string name)
+    {
+        return GL.GetUniformLocation(_handle, name);
     }
 }

@@ -1,39 +1,51 @@
+using LiSAM.Visualization.Graphics;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
-using LiSAM.Visualization.Graphics;
 
 namespace LiSAM.Visualization;
 
 /// <summary>
-/// Renders an arbitrary number of colored points from one interleaved vertex buffer
-/// using a single draw call.
+///     Renders an arbitrary number of colored points from one interleaved vertex buffer
+///     using a single draw call.
 /// </summary>
 public sealed class PointCloudRenderer : IDisposable
 {
     private const int FloatsPerPoint = 7;
-    private readonly object _sync = new();
-    private readonly List<PointEntry> _points = [];
     private readonly Dictionary<PointHandle, int> _indices = [];
+    private readonly List<PointEntry> _points = [];
     private readonly ShaderProgram _shader;
+    private readonly object _sync = new();
+    private bool _disposed;
+    private int _pointCount;
+    private int _uploadedVersion = -1;
 
     private int _vao;
     private int _vbo;
-    private int _uploadedVersion = -1;
     private int _version;
-    private int _pointCount;
-    private bool _disposed;
+
+    public PointCloudRenderer(string vertexShaderPath, string fragmentShaderPath)
+    {
+        _shader = new ShaderProgram(vertexShaderPath, fragmentShaderPath);
+    }
 
     public int Count
     {
         get
         {
-            lock (_sync) return _points.Count;
+            lock (_sync)
+            {
+                return _points.Count;
+            }
         }
     }
 
-    public PointCloudRenderer(string vertexShaderPath, string fragmentShaderPath)
+    public void Dispose()
     {
-        _shader = new ShaderProgram(vertexShaderPath, fragmentShaderPath);
+        if (_disposed) return;
+        GL.DeleteBuffer(_vbo);
+        GL.DeleteVertexArray(_vao);
+        _shader.Dispose();
+        _disposed = true;
     }
 
     public void OnLoad()
@@ -45,16 +57,16 @@ public sealed class PointCloudRenderer : IDisposable
         GL.BindVertexArray(_vao);
         GL.BindBuffer(BufferTarget.ArrayBuffer, _vbo);
 
-        var stride = FloatsPerPoint * sizeof(float);
-        var positionLocation = _shader.GetAttribLocation("aPosition");
+        int stride = FloatsPerPoint * sizeof(float);
+        int positionLocation = _shader.GetAttribLocation("aPosition");
         GL.EnableVertexAttribArray((uint)positionLocation);
         GL.VertexAttribPointer((uint)positionLocation, 3, VertexAttribPointerType.Float, false, stride, 0);
 
-        var colorLocation = _shader.GetAttribLocation("aColor");
+        int colorLocation = _shader.GetAttribLocation("aColor");
         GL.EnableVertexAttribArray((uint)colorLocation);
         GL.VertexAttribPointer((uint)colorLocation, 3, VertexAttribPointerType.Float, false, stride, 3 * sizeof(float));
 
-        var sizeLocation = _shader.GetAttribLocation("aSize");
+        int sizeLocation = _shader.GetAttribLocation("aSize");
         GL.EnableVertexAttribArray((uint)sizeLocation);
         GL.VertexAttribPointer((uint)sizeLocation, 1, VertexAttribPointerType.Float, false, stride, 6 * sizeof(float));
 
@@ -81,7 +93,7 @@ public sealed class PointCloudRenderer : IDisposable
         lock (_sync)
         {
             _points.EnsureCapacity(_points.Count + points.Length);
-            for (var i = 0; i < points.Length; i++)
+            for (int i = 0; i < points.Length; i++)
             {
                 Validate(points[i]);
                 if (!handles[i].IsValid || _indices.ContainsKey(handles[i]))
@@ -98,15 +110,16 @@ public sealed class PointCloudRenderer : IDisposable
     {
         lock (_sync)
         {
-            if (!_indices.Remove(handle, out var index)) return false;
+            if (!_indices.Remove(handle, out int index)) return false;
 
-            var lastIndex = _points.Count - 1;
+            int lastIndex = _points.Count - 1;
             if (index != lastIndex)
             {
-                var moved = _points[lastIndex];
+                PointEntry moved = _points[lastIndex];
                 _points[index] = moved;
                 _indices[moved.Handle] = index;
             }
+
             _points.RemoveAt(lastIndex);
             _version++;
             return true;
@@ -115,9 +128,10 @@ public sealed class PointCloudRenderer : IDisposable
 
     public int RemovePoints(ReadOnlySpan<PointHandle> handles)
     {
-        var removed = 0;
-        foreach (var handle in handles)
-            if (RemovePoint(handle)) removed++;
+        int removed = 0;
+        foreach (PointHandle handle in handles)
+            if (RemovePoint(handle))
+                removed++;
         return removed;
     }
 
@@ -151,8 +165,8 @@ public sealed class PointCloudRenderer : IDisposable
         {
             if (_uploadedVersion == _version) return;
             snapshot = new float[_points.Count * FloatsPerPoint];
-            var offset = 0;
-            foreach (var entry in _points) Append(snapshot, ref offset, entry.Point);
+            int offset = 0;
+            foreach (PointEntry entry in _points) Append(snapshot, ref offset, entry.Point);
             _pointCount = _points.Count;
             _uploadedVersion = _version;
         }
@@ -176,20 +190,11 @@ public sealed class PointCloudRenderer : IDisposable
         vertices[offset++] = point.Size;
     }
 
-    private readonly record struct PointEntry(PointHandle Handle, CloudPoint Point);
-
     private static void Validate(CloudPoint point)
     {
         if (point.Size <= 0f)
             throw new ArgumentOutOfRangeException(nameof(point), "Point size must be greater than zero.");
     }
 
-    public void Dispose()
-    {
-        if (_disposed) return;
-        GL.DeleteBuffer(_vbo);
-        GL.DeleteVertexArray(_vao);
-        _shader.Dispose();
-        _disposed = true;
-    }
+    private readonly record struct PointEntry(PointHandle Handle, CloudPoint Point);
 }
