@@ -18,18 +18,17 @@ public class LiSam(Visualizer visualizer)
         }*/
 
         HttpClient client = new();
-        client.BaseAddress = new Uri("http://localhost:5000/");
+        client.BaseAddress = new Uri("http://103.125.154.215:25565/datasets/");
 
         PointCloudData data =
-            await SemanticKITTIDataImporter.ImportPointCloudDataFromFile("dataset/kitti/000001.bin");
+            await SemanticKITTIDataImporter.ImportPointCloudDataFromUrl(client,
+                "semanticKITTI/sequences/00/velodyne/000001.bin");
         CalibrationData calibrationData =
-            await SemanticKITTIDataImporter.ImportCalibrationDataFromFile("dataset/kitti/calib.txt");
-        LabelData labelData = await SemanticKITTIDataImporter.ImportLabelDataFromFile("dataset/kitti/000001.label");
-
-        PosesData posesData = await HeLiMOSDataImpoorter.ImportPosesDataFromFile("dataset/poses.txt");
-
-        Matrix3x4 transform = posesData.Transforms[11498];
-        transform.Column3 = new Vector3(0f, 0f, 0f);
+            await SemanticKITTIDataImporter.ImportCalibrationDataFromUrl(client,
+                "semanticKITTI/sequences/00/calib.txt");
+        LabelData labelData =
+            await SemanticKITTIDataImporter.ImportLabelDataFromUrl(client,
+                "semanticKITTI/sequences/00/labels/000001.label");
 
         SemanticKITTIDataImporter.ApplyCalibrationData(data, calibrationData, Matrix4.Identity);
 
