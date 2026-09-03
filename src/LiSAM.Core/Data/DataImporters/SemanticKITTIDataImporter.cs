@@ -89,16 +89,8 @@ public abstract class SemanticKITTIDataImporter : IDataImporter
                     calib.P3 = IDataImporter.ToMatrix3x4(values);
                     break;
 
-                case "R0_rect":
-                    calib.TransformCameraToNormal = IDataImporter.ToMatrix3(values);
-                    break;
-
-                case "Tr_velo_to_cam":
+                case "Tr":
                     calib.TransformVeloToCam = IDataImporter.ToMatrix3x4(values);
-                    break;
-
-                case "Tr_imu_to_velo":
-                    calib.TransformIMUToVelo = IDataImporter.ToMatrix3x4(values);
                     break;
             }
         }
@@ -149,12 +141,96 @@ public abstract class SemanticKITTIDataImporter : IDataImporter
         return await ImportPosesData(stream);
     }
 
+    public static async Task<LabelData> ImportLabelData(Stream stream)
+    {
+        await using MemoryStream memory = new();
+        await stream.CopyToAsync(memory);
+
+        byte[] byteBuffer = memory.ToArray();
+
+        if (byteBuffer.Length % 4 != 0)
+            throw new InvalidDataException(
+                $"Invalid label stream: {byteBuffer.Length} bytes is not divisible by 4."
+            );
+
+        int count = byteBuffer.Length / 4;
+
+        LidarSemanticLabel[] semanticLabels = new LidarSemanticLabel[count];
+        int[] instanceIDs = new int[count];
+
+        for (int i = 0; i < count; i++)
+        {
+            ushort semanticId = BitConverter.ToUInt16(byteBuffer, i * 4);
+            ushort instanceId = BitConverter.ToUInt16(byteBuffer, i * 4 + 2);
+
+            semanticLabels[i] = MapSemanticKitti(semanticId);
+            instanceIDs[i] = instanceId;
+        }
+
+        return new LabelData(semanticLabels, instanceIDs);
+    }
+
+    public static Task<LabelData> ImportLabelDataFromFile(string path)
+    {
+        FileStream fileStream = new(path, FileMode.Open, FileAccess.Read);
+        return ImportLabelData(fileStream);
+    }
+
+    public static async Task<LabelData> ImportLabelDataFromUrl(HttpClient client, string url)
+    {
+        Stream stream = await client.GetStreamAsync(url);
+        return await ImportLabelData(stream);
+    }
+
     public static void ApplyCalibrationData(PointCloudData pointCloudData, CalibrationData calibrationData,
         Matrix4 transform)
     {
         for (int i = 0; i < pointCloudData.Points.Length; i++)
-            pointCloudData.Points[i] = calibrationData.TransformCameraToNormal * (calibrationData.TransformVeloToCam *
-                (transform * new Vector4(pointCloudData.Points[i].X, -pointCloudData.Points[i].Y,
-                    -pointCloudData.Points[i].Z, 1f)));
+            pointCloudData.Points[i] = calibrationData.TransformVeloToCam *
+                                       new Vector4(pointCloudData.Points[i].X, -pointCloudData.Points[i].Y,
+                                           -pointCloudData.Points[i].Z, 1f);
+    }
+
+    private static LidarSemanticLabel MapSemanticKitti(int label)
+    {
+        return label switch
+        {
+            10 => LidarSemanticLabel.Car,
+            11 => LidarSemanticLabel.Bicycle,
+            13 => LidarSemanticLabel.Bus,
+            15 => LidarSemanticLabel.Motorcycle,
+            18 => LidarSemanticLabel.Truck,
+
+            20 => LidarSemanticLabel.OtherVehicle,
+
+            30 => LidarSemanticLabel.Pedestrian,
+            31 => LidarSemanticLabel.Cyclist,
+            32 => LidarSemanticLabel.Motorcyclist,
+
+            40 => LidarSemanticLabel.Road,
+            44 => LidarSemanticLabel.Parking,
+            48 => LidarSemanticLabel.Sidewalk,
+            49 => LidarSemanticLabel.OtherGround,
+
+            50 => LidarSemanticLabel.Building,
+            51 => LidarSemanticLabel.Fence,
+
+            70 => LidarSemanticLabel.Vegetation,
+            71 => LidarSemanticLabel.Trunk,
+            72 => LidarSemanticLabel.Terrain,
+
+            80 => LidarSemanticLabel.Pole,
+            81 => LidarSemanticLabel.TrafficSign,
+
+            252 => LidarSemanticLabel.Car,
+            253 => LidarSemanticLabel.Cyclist,
+            254 => LidarSemanticLabel.Pedestrian,
+            255 => LidarSemanticLabel.Motorcyclist,
+            257 => LidarSemanticLabel.OtherVehicle,
+            258 => LidarSemanticLabel.Truck,
+            259 => LidarSemanticLabel.OtherVehicle,
+
+            _ => LidarSemanticLabel.Unknown
+        };
     }
 }

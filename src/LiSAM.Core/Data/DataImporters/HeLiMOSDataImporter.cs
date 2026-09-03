@@ -23,9 +23,9 @@ public abstract class HeLiMOSDataImpoorter : IDataImporter
         for (int i = 0; i < points.Length; i++)
         {
             float x = BitConverter.ToSingle(byteBuffer, i * 16);
-            float y = BitConverter.ToSingle(byteBuffer, i * 16 + 4);
-            float z = BitConverter.ToSingle(byteBuffer, i * 16 + 8);
-            float intensity = BitConverter.ToSingle(byteBuffer, i * 16 + 12);
+            float z = BitConverter.ToSingle(byteBuffer, i * 16 + 4);
+            float y = BitConverter.ToSingle(byteBuffer, i * 16 + 8);
+            float intensity = BitConverter.ToSingle(byteBuffer, i * 16 + 12) / 255f;
             points[i] = new Vector3(x, y, z);
             intensities[i] = intensity;
         }
@@ -143,12 +143,43 @@ public abstract class HeLiMOSDataImpoorter : IDataImporter
         return await ImportPosesData(stream);
     }
 
-    public static void ApplyCalibrationData(PointCloudData pointCloudData, CalibrationData calibrationData,
+    public static Task<LabelData> ImportLabelData(Stream stream)
+    {
+        throw new NotImplementedException();
+    }
+
+    public static Task<LabelData> ImportLabelDataFromFile(string path)
+    {
+        throw new NotImplementedException();
+    }
+
+    public static Task<LabelData> ImportLabelDataFromUrl(HttpClient client, string url)
+    {
+        throw new NotImplementedException();
+    }
+
+    public static void ApplyCalibrationData(
+        PointCloudData pointCloudData,
+        CalibrationData calibrationData,
         Matrix4 transform)
     {
         for (int i = 0; i < pointCloudData.Points.Length; i++)
-            pointCloudData.Points[i] = calibrationData.TransformVeloToCam *
-                                       (transform * new Vector4(pointCloudData.Points[i].X, -pointCloudData.Points[i].Y,
-                                           -pointCloudData.Points[i].Z, 1f));
+        {
+            Vector4 p = new(
+                pointCloudData.Points[i].X,
+                pointCloudData.Points[i].Y,
+                pointCloudData.Points[i].Z,
+                1f);
+
+            Vector3 calibrated = calibrationData.TransformVeloToCam * p;
+
+            Vector4 world = transform * new Vector4(
+                calibrated.X,
+                calibrated.Y,
+                calibrated.Z,
+                1f);
+
+            pointCloudData.Points[i] = world.Xyz;
+        }
     }
 }
