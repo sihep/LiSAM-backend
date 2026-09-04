@@ -96,4 +96,75 @@ public class LiSam(Visualizer visualizer)
             _ => Vector3.One
         };
     }
+
+    public async void RunRoiHighlightTest(string[] args)
+    {
+        HttpClient client = new();
+        client.BaseAddress = new Uri("http://103.125.154.215:25565/datasets/");
+
+        PointCloudData data =
+            await SemanticKITTIDataImporter.ImportPointCloudDataFromUrl(client,
+                "semanticKITTI/sequences/00/velodyne/000002.bin");
+        CalibrationData calibrationData =
+            await SemanticKITTIDataImporter.ImportCalibrationDataFromUrl(client,
+                "semanticKITTI/sequences/00/calib.txt");
+
+        SemanticKITTIDataImporter.ApplyCalibrationData(data, calibrationData, Matrix4.Identity);
+
+        PolarGridConfig gridConfig = new() { MaxRange = 80f, RingCount = 40, SectorCount = 360 };
+        HeuristicRoiSelector roiSelector = new() { ScoreThreshold = 0.3f };
+
+        PolarGrid grid = PolarGrid.Build(data, gridConfig);
+        List<RoiRegion> rois = roiSelector.SelectRois(grid);
+
+        Console.WriteLine($"ROIs found: {rois.Count}");
+        int coveredCount = 0;
+        foreach (RoiRegion roi in rois) coveredCount += roi.PointCount;
+        Console.WriteLine($"Points covered: {coveredCount} / {data.Points.Length} " +
+                           $"({(float)coveredCount / data.Points.Length:P1})");
+
+        Vector3 uncoveredColor = new(0.1f, 0.1f, 0.1f);
+        Vector3[] colors = new Vector3[data.Points.Length];
+        for (int i = 0; i < colors.Length; i++)
+            colors[i] = uncoveredColor;
+
+        for (int r = 0; r < rois.Count; r++)
+        {
+            Vector3 color = RoiColor(r);
+            foreach (int idx in rois[r].PointIndices())
+                colors[idx] = color;
+        }
+
+        for (int i = 0; i < data.Points.Length; i++)
+            _visualizer.AddPoint(new CloudPoint(data.Points[i], data.Intensities[i] * colors[i]));
+    }
+
+    /// <summary>Visually distinct color per ROI index, spaced by the golden ratio so adjacent indices don't look similar.</summary>
+    private static Vector3 RoiColor(int index)
+    {
+        float hue = (index * 0.61803398875f) % 1f;
+        return HsvToRgb(hue, 0.85f, 1f);
+    }
+
+    private static Vector3 HsvToRgb(float h, float s, float v)
+    {
+        int i = (int)(h * 6f);
+        float f = h * 6f - i;
+        float p = v * (1f - s);
+        float q = v * (1f - f * s);
+        float t = v * (1f - (1f - f) * s);
+
+        return (i % 6) switch
+        {
+            0 => new Vector3(v, t, p),
+            1 => new Vector3(q, v, p),
+            2 => new Vector3(p, v, t),
+            3 => new Vector3(p, q, v),
+            4 => new Vector3(t, p, v),
+            _ => new Vector3(v, p, q)
+        };
+    }
+
+
+
 }
