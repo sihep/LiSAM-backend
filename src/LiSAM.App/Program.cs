@@ -21,7 +21,7 @@ public static class Program
         Task lisamTask = Task.Run(() =>
         {
             LiSam lisam = new(visualizer);
-            lisam.Run(args);
+            lisam.Run(args);   // was: lisam.Run(args);
         });
 
         visualizer.Run();

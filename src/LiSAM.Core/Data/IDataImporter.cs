@@ -16,7 +16,7 @@ public interface IDataImporter
     static abstract Task<PosesData> ImportPosesData(Stream stream);
     static abstract Task<PosesData> ImportPosesDataFromFile(string path);
     static abstract Task<PosesData> ImportPosesDataFromUrl(HttpClient client, string url);
-    
+
     static abstract Task<LabelData> ImportLabelData(Stream stream);
     static abstract Task<LabelData> ImportLabelDataFromFile(string path);
     static abstract Task<LabelData> ImportLabelDataFromUrl(HttpClient client, string url);
