@@ -1,4 +1,5 @@
 using LiSAM.Visualization.Graphics;
+using LiSAM.Visualization.Input;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
@@ -7,7 +8,7 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace LiSAM.Visualization;
 
-/// <summary>An interactive window optimized for large colored point clouds.</summary>
+/// <summary>An interactive point-cloud window using right-handed world coordinates with +Z up.</summary>
 public class Visualizer(GameWindowSettings gameWindowSettings, NativeWindowSettings nativeWindowSettings)
     : GameWindow(gameWindowSettings, nativeWindowSettings)
 {
@@ -24,6 +25,8 @@ public class Visualizer(GameWindowSettings gameWindowSettings, NativeWindowSetti
     private PrimitiveRenderer _primitives = null!;
     private Matrix4 _projection;
     private float _yaw;
+
+    public InputState InputState { get; } = new();
 
     public int PointCount
     {
@@ -112,6 +115,27 @@ public class Visualizer(GameWindowSettings gameWindowSettings, NativeWindowSetti
         }
     }
 
+    /// <summary>
+    /// Adds an arc about center in a quaternion-oriented XY plane. Angles are radians;
+    /// positive sweeps go from local +X toward +Y. Segments=0 selects automatic resolution.
+    /// </summary>
+    public void AddArc(Vector3 center, float radius, float sweepAngle, Quaternion orientation,
+        Vector4 color, float startAngle = 0f, int segments = 0)
+    {
+        AddArc(new CloudArc(center, radius, sweepAngle, orientation, color, startAngle, segments));
+    }
+
+    /// <summary>Adds an arc before startup or while running. ClearPrimitives removes it.</summary>
+    public void AddArc(CloudArc arc)
+    {
+        CloudLine[] lines = arc.ToLines();
+        lock (_pendingSync)
+        {
+            if (_loaded) _primitives.AddLines(lines);
+            else _pendingLines.AddRange(lines);
+        }
+    }
+
     public void AddLine(Vector3 start, Vector3 end, Vector4 color)
     {
         AddLine(new CloudLine(start, end, color));
@@ -183,7 +207,7 @@ public class Visualizer(GameWindowSettings gameWindowSettings, NativeWindowSetti
         GL.Enable(EnableCap.ProgramPointSize);
         GL.ClearColor(0.1f, 0.1f, 0.1f, 1f);
 
-        _camera = new Camera(new Vector3(0f, 0f, 5f), Vector3.UnitY, -Vector3.UnitZ);
+        _camera = new Camera(new Vector3(0f, -5f, 0f), Vector3.UnitZ, Vector3.UnitY);
         (_yaw, _pitch) = _camera.GetYawAndPitch();
         (_yaw, _pitch) = (MathHelper.RadiansToDegrees(_yaw), MathHelper.RadiansToDegrees(_pitch));
         UpdateProjection(Size.X, Size.Y);
@@ -214,6 +238,18 @@ public class Visualizer(GameWindowSettings gameWindowSettings, NativeWindowSetti
         Console.WriteLine($"GPU: {GL.GetString(StringName.Renderer)}");
         Console.WriteLine($"Vendor: {GL.GetString(StringName.Vendor)}");
         Console.WriteLine($"OpenGL: {GL.GetString(StringName.Version)}");
+    }
+
+    protected override void OnKeyDown(KeyboardKeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        InputState.SetKeyHeld(e.Key);
+    }
+
+    protected override void OnKeyUp(KeyboardKeyEventArgs e)
+    {
+        base.OnKeyUp(e);
+        InputState.SetKeyUp(e.Key);
     }
 
     protected override void OnUpdateFrame(FrameEventArgs args)
@@ -253,12 +289,19 @@ public class Visualizer(GameWindowSettings gameWindowSettings, NativeWindowSetti
         _camera.ChangeDirectionTo(_yaw, _pitch);
     }
 
+    /// <summary>Sets the camera directly in the same Z-up world coordinates as the geometry.</summary>
+    public void SetCameraPosition(Vector3 position)
+    {
+        _camera.Position = position;
+    }
+
     protected override void OnRenderFrame(FrameEventArgs args)
     {
         base.OnRenderFrame(args);
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-        _points.Draw(_camera.View, _projection);
-        _primitives.Draw(_camera.View, _projection, _camera.Position);
+        Matrix4 view = _camera.View;
+        _points.Draw(view, _projection);
+        _primitives.Draw(view, _projection, _camera.Position);
         SwapBuffers();
     }
 

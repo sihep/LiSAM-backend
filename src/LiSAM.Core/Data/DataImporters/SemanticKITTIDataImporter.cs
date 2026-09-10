@@ -24,9 +24,9 @@ public abstract class SemanticKITTIDataImporter : IDataImporter
         {
             float x = BitConverter.ToSingle(byteBuffer, i * 16);
             float y = BitConverter.ToSingle(byteBuffer, i * 16 + 4);
-            float z = BitConverter.ToSingle(byteBuffer, i * 16 + 8);
+            float elevation = BitConverter.ToSingle(byteBuffer, i * 16 + 8);
             float intensity = BitConverter.ToSingle(byteBuffer, i * 16 + 12);
-            points[i] = new Vector3(x, y, z);
+            points[i] = new Vector3(x, y, elevation);
             intensities[i] = intensity;
         }
 
@@ -90,7 +90,7 @@ public abstract class SemanticKITTIDataImporter : IDataImporter
                     break;
 
                 case "Tr":
-                    calib.TransformVeloToCam = IDataImporter.ToMatrix3x4(values);
+                    calib.Transform = IDataImporter.ToMatrix3x4(values);
                     break;
             }
         }
@@ -122,6 +122,8 @@ public abstract class SemanticKITTIDataImporter : IDataImporter
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries)
                 .Select(v => float.Parse(v, CultureInfo.InvariantCulture))
                 .ToArray();
+
+            if (values.Length != 12) continue;
 
             poses.Transforms[i] = IDataImporter.ToMatrix3x4(values);
         }
@@ -182,13 +184,36 @@ public abstract class SemanticKITTIDataImporter : IDataImporter
         return await ImportLabelData(stream);
     }
 
+    public static string GetPointCloudDataPath(int sequence, int scene)
+    {
+        return $"semanticKITTI/sequences/{sequence:D2}/velodyne/{scene:D6}.bin";
+    }
+
+    public static string GetLabelDataPath(int sequence, int scene)
+    {
+        return $"semanticKITTI/sequences/{sequence:D2}/labels/{scene:D6}.label";
+    }
+
+    public static string GetCalibrationDataPath(int sequence, int scene)
+    {
+        return $"semanticKITTI/sequences/{sequence:D2}/calib.txt";
+    }
+
+    public static string GetPosesDataPath(int sequence, int scene)
+    {
+        return $"semanticKITTI/sequences/{sequence:D2}/poses.txt";
+    }
+
     public static void ApplyCalibrationData(PointCloudData pointCloudData, CalibrationData calibrationData,
         Matrix4 transform)
     {
         for (int i = 0; i < pointCloudData.Points.Length; i++)
-            pointCloudData.Points[i] = calibrationData.TransformVeloToCam *
-                                       new Vector4(pointCloudData.Points[i].X, -pointCloudData.Points[i].Y,
-                                           -pointCloudData.Points[i].Z, 1f);
+        {
+            Vector3 cameraPoint = calibrationData.Transform *
+                                  new Vector4(pointCloudData.Points[i], 1f);
+            // Camera (right, down, forward) to display (forward, left, up).
+            pointCloudData.Points[i] = new Vector3(cameraPoint.Z, -cameraPoint.X, -cameraPoint.Y);
+        }
     }
 
     private static LidarSemanticLabel MapSemanticKitti(int label)

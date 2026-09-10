@@ -1,4 +1,3 @@
-using System.Globalization;
 using OpenTK.Mathematics;
 
 namespace LiSAM.Core.Data;
@@ -16,10 +15,15 @@ public interface IDataImporter
     static abstract Task<PosesData> ImportPosesData(Stream stream);
     static abstract Task<PosesData> ImportPosesDataFromFile(string path);
     static abstract Task<PosesData> ImportPosesDataFromUrl(HttpClient client, string url);
-    
+
     static abstract Task<LabelData> ImportLabelData(Stream stream);
     static abstract Task<LabelData> ImportLabelDataFromFile(string path);
     static abstract Task<LabelData> ImportLabelDataFromUrl(HttpClient client, string url);
+
+    static abstract string GetPointCloudDataPath(int sequence, int scene);
+    static abstract string GetLabelDataPath(int sequence, int scene);
+    static abstract string GetCalibrationDataPath(int sequence, int scene);
+    static abstract string GetPosesDataPath(int sequence, int scene);
 
     static abstract void ApplyCalibrationData(PointCloudData pointCloudData, CalibrationData calibrationData,
         Matrix4 transform);

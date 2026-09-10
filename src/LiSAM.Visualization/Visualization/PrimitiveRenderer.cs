@@ -4,7 +4,7 @@ using OpenTK.Mathematics;
 
 namespace LiSAM.Visualization;
 
-/// <summary>Batches colored lines and translucent cuboids into two draw calls.</summary>
+/// <summary>Batches colored lines, arcs, and translucent cuboids into two draw calls.</summary>
 public sealed class PrimitiveRenderer : IDisposable
 {
     private const int FloatsPerVertex = 7;
@@ -76,6 +76,11 @@ public sealed class PrimitiveRenderer : IDisposable
         GL.VertexAttribPointer((uint)colorLocation, 4, VertexAttribPointerType.Float, false, stride, 3 * sizeof(float));
         GL.BindVertexArray(0);
         return (vao, vbo);
+    }
+
+    public void AddArc(CloudArc arc)
+    {
+        AddLines(arc.ToLines());
     }
 
     public void AddLine(CloudLine line)

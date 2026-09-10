@@ -4,10 +4,10 @@ namespace LiSAM.Visualization.Graphics;
 
 internal sealed class Camera
 {
+    private readonly Vector3 _up;
     private Vector3 _direction;
     private bool _dirty = true;
     private Vector3 _position;
-    private readonly Vector3 _up;
     private Matrix4 _view;
 
     public Camera(Vector3 position, Vector3 up, Vector3 direction)
@@ -20,7 +20,7 @@ internal sealed class Camera
     public Vector3 Position
     {
         get => _position;
-        private set
+        set
         {
             _position = value;
             _dirty = true;
@@ -83,13 +83,13 @@ internal sealed class Camera
         float pitchRadians = MathHelper.DegreesToRadians(Math.Clamp(pitch, -89f, 89f));
         float yawRadians = MathHelper.DegreesToRadians(yaw);
         Direction = new Vector3(
+            MathF.Cos(pitchRadians) * MathF.Cos(yawRadians),
             MathF.Cos(pitchRadians) * MathF.Sin(yawRadians),
-            MathF.Sin(pitchRadians),
-            MathF.Cos(pitchRadians) * MathF.Cos(yawRadians));
+            MathF.Sin(pitchRadians));
     }
 
     public (float Yaw, float Pitch) GetYawAndPitch()
     {
-        return (MathF.Atan2(Direction.X, Direction.Z), MathF.Asin(Direction.Y));
+        return (MathF.Atan2(Direction.Y, Direction.X), MathF.Asin(Direction.Z));
     }
 }

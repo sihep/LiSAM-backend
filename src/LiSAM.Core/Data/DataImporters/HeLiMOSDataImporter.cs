@@ -4,6 +4,9 @@ using OpenTK.Mathematics;
 
 namespace LiSAM.Core.Data.DataImporters;
 
+/// <summary>
+///     WIP
+/// </summary>
 public abstract class HeLiMOSDataImpoorter : IDataImporter
 {
     public static async Task<PointCloudData> ImportPointCloudData(Stream stream)
@@ -23,8 +26,8 @@ public abstract class HeLiMOSDataImpoorter : IDataImporter
         for (int i = 0; i < points.Length; i++)
         {
             float x = BitConverter.ToSingle(byteBuffer, i * 16);
-            float z = BitConverter.ToSingle(byteBuffer, i * 16 + 4);
-            float y = BitConverter.ToSingle(byteBuffer, i * 16 + 8);
+            float y = BitConverter.ToSingle(byteBuffer, i * 16 + 4);
+            float z = BitConverter.ToSingle(byteBuffer, i * 16 + 8);
             float intensity = BitConverter.ToSingle(byteBuffer, i * 16 + 12) / 255f;
             points[i] = new Vector3(x, y, z);
             intensities[i] = intensity;
@@ -90,7 +93,7 @@ public abstract class HeLiMOSDataImpoorter : IDataImporter
                     break;
 
                 case "Tr":
-                    calib.TransformVeloToCam = IDataImporter.ToMatrix3x4(values);
+                    calib.Transform = IDataImporter.ToMatrix3x4(values);
                     break;
             }
         }
@@ -158,6 +161,26 @@ public abstract class HeLiMOSDataImpoorter : IDataImporter
         throw new NotImplementedException();
     }
 
+    public static string GetPointCloudDataPath(int sequence, int scene)
+    {
+        return $"HeLiMOS/sequences/{sequence:D2}/velodyne/{scene:D6}.bin";
+    }
+
+    public static string GetLabelDataPath(int sequence, int scene)
+    {
+        return $"HeLiMOS/sequences/{sequence:D2}/labels/{scene:D6}.label";
+    }
+
+    public static string GetCalibrationDataPath(int sequence, int scene)
+    {
+        return $"HeLiMOS/sequences/{sequence:D2}/calib.txt";
+    }
+
+    public static string GetPosesDataPath(int sequence, int scene)
+    {
+        return $"HeLiMOS/sequences/{sequence:D2}/poses.txt";
+    }
+
     public static void ApplyCalibrationData(
         PointCloudData pointCloudData,
         CalibrationData calibrationData,
@@ -171,7 +194,7 @@ public abstract class HeLiMOSDataImpoorter : IDataImporter
                 pointCloudData.Points[i].Z,
                 1f);
 
-            Vector3 calibrated = calibrationData.TransformVeloToCam * p;
+            Vector3 calibrated = calibrationData.Transform * p;
 
             Vector4 world = transform * new Vector4(
                 calibrated.X,
